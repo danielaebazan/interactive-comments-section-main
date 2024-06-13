@@ -1,15 +1,24 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { PostList } from "./components/PostLists"
+import { Post } from "./components/Post";
+import { PostList } from "./components/PostLists";
+import { PostProvider } from "./contexts/PostContext";
 
 function App() {
   return (
     <div className="container">
-  <Routes>
-    <Route path="/" element ={<PostList />} />
-    <Route path="/posts/:id" element ={<h1>Post</h1>} />
-  </Routes>
-   </div>
+      <Routes>
+        <Route path="/" element={<PostList />} />
+        <Route
+          path="/posts/:id"
+          element={
+            <PostProvider>
+              <Post />
+            </PostProvider>
+          }
+        />
+      </Routes>
+    </div>
   )
 }
 
