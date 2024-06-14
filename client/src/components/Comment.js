@@ -1,5 +1,6 @@
 import { IconBtn } from "./IconBtn"
 import { FaEdit, FaHeart, FaRegHeart, FaReply, FaTrash } from "react-icons/fa"
+import { formatDistanceToNow } from 'date-fns';
 import { usePost } from "../contexts/PostContext"
 import { CommentList } from "./CommentList"
 import { CommentForm } from "./CommentForm"
@@ -7,12 +8,6 @@ import { useState } from "react"
 import { useAsyncFn } from "../hooks/useAsync"
 import { useUser } from "../hooks/useUser"
 import { createComment, updateComment, deleteComment, toggleCommentLike} from "../services/comments"
-
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-})
-
 
 export function Comment({ id, message, user, createdAt, likeCount, likedByMe }) {
     const [areChildrenHidden, setAreChildrenHidden] = useState(false)
@@ -60,7 +55,8 @@ export function Comment({ id, message, user, createdAt, likeCount, likedByMe }) 
         <div className="comment">
             <div className="header">
                 <span className="username">{user.username}</span>
-                <span className="date">{dateFormatter.format(Date.parse(createdAt))}</span>
+               
+                <span className="date">{formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
               </div>
         {isEditing ? (
           <CommentForm
