@@ -21,16 +21,19 @@ export function Post() {
             <article>{post.body}</article>
             <h3 className="comments-title">Comments</h3>
             <section>
-                <CommentForm 
-                    loading={loading} 
-                    error={error} 
-                    onSubmit={onCommentCreate} 
-                />
                 {rootComments != null && rootComments.length > 0 && (
                     <div className="mt-4">
                         <CommentList comments={rootComments} />
                     </div>
                 )}
+                
+                <div className="element-container">
+                    <CommentForm 
+                        loading={loading} 
+                        error={error} 
+                        onSubmit={onCommentCreate} 
+                    />
+                </div>
             </section>
         </>
     )

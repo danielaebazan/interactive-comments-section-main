@@ -20,7 +20,7 @@ function handleSubmit(e) {
             value={message} onChange={e => setMessage(e.target.value)}
             className="message-input"/>
             <button className="btn" type="submit" disabled={loading}>
-                { loading ? "loading" : "Post"}
+                { loading ? "loading" : "Send"}
             </button>
         </div>
         <div className="error-msg">{error}</div>

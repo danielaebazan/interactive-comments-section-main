@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
+
 *,
 *::before,
 *::after {
@@ -6,14 +8,23 @@
 
 body {
     margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Rubik', sans-serif;
     line-height: 1.4;
+    background: hsl(228, 33%, 97%);
 }
 
 .container {
     max-width: 1200px;
     width: calc(100vw - 4rem);
     margin: 2rem auto;
+}
+
+.element-container {
+    margin-top: 1em;
+    padding: 1.5em;
+    background: hsl(0, 0%, 100%);
+    height: 7em;
+    border-radius: .5rem;
 }
 
 button {
@@ -31,7 +42,7 @@ button {
 
 .comment-form-row {
     display: flex;
-    gap: .5rem;
+    gap: .6rem;
 }
 
 .message-input {
@@ -42,7 +53,7 @@ button {
     padding: .5em;
     font-size: inherit;
     font-family: inherit;
-    border: 2px solid hsl(235, 50%, 74%);
+    border: 1px solid hsl(223, 19%, 93%);
     line-height: 1.4;
 }
 
@@ -90,7 +101,7 @@ button {
 
 .collapse-line:hover::before,
 .collapse-line:focus-visible::before {
-    background-color: hsl(235, 100%, 60%);
+    background-color: hsl(238, 40%, 52%);
 }
 
 .collapse-line::before {
@@ -110,14 +121,15 @@ button {
 
 .btn {
     --hue: 235;
-    --color: hsl(var(--hue), 100%, 67%);
-    padding: .5em 1em;
+    --color: hsl(238, 40%, 52%);
+    padding: 1em 2em;
     background: var(--color);
     border: none;
     color: white;
     border-radius: .5em;
     font-size: .75em;
     cursor: pointer;
+    height: fit-content;
 }
 
 .btn:hover,
@@ -166,20 +178,25 @@ button {
 
 .comment {
     padding: .5rem;
-    border: 1px solid hsl(235, 100%, 90%);
+    color: hsl(211, 10%, 45%);
     border-radius: .5rem;
+    background: hsl(0, 0%, 100%);
 }
 
 .comment .header {
-    color: hsl(235, 50%, 67%);
+    color: hsl(238, 40%, 52%);
     display: flex;
     justify-content: space-between;
     margin-bottom: .25rem;
     font-size: .75em;
 }
 
-.comment .header .name {
+.comment .header .username {
     font-weight: bold;
+}
+
+.comment .header .date {
+    color: hsl(211, 10%, 45%)!important;
 }
 
 .comment .message {
