@@ -54,9 +54,49 @@ export function Comment({ id, message, user, createdAt, likeCount, likedByMe }) 
     return <>
         <div className="comment">
             <div className="header">
+             <div className="left-header">  
                 <span className="username">{user.username}</span>
-               
                 <span className="date">{formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+            </div> 
+
+                <div className="footer">
+                <IconBtn 
+                onClick = {onToggleCommentLike}
+                disabled = { toggleCommentLikeFn.loading}
+                Icon={likedByMe ? FaHeart : FaRegHeart} 
+                aria-label={likedByMe ? "Unlike" : "Like"}> 
+                    {likeCount}
+                </IconBtn>
+                <IconBtn 
+                onClick={() => setIsReplying(prev => !prev)}
+                isActive={isReplying} 
+                Icon={FaReply} 
+                aria-label={isReplying ? "Cancel Reply" : "Reply"}>
+                  Reply
+                </IconBtn> 
+                
+                {user.id === currentUser.id && (
+                    <>
+                      <IconBtn
+                        onClick={() => setIsEditing(prev => !prev)}
+                        isActive={isEditing}
+                        Icon={FaEdit}
+                        aria-label={isEditing ? "Cancel Edit" : "Edit"}>
+                          Edit
+                        </IconBtn>
+
+                      <IconBtn
+                        disabled={deleteCommentFn.loading}
+                        onClick={onCommentDelete}
+                        Icon={FaTrash}
+                        aria-label="Delete"
+                        color="danger">
+                          Delete
+                        </IconBtn>
+                    </>
+                  )}
+            </div>
+
               </div>
         {isEditing ? (
           <CommentForm
@@ -69,38 +109,7 @@ export function Comment({ id, message, user, createdAt, likeCount, likedByMe }) 
         ) : (
           <div className="message">{message}</div>
         )}
-            <div className="footer">
-                <IconBtn 
-                onClick = {onToggleCommentLike}
-                disabled = { toggleCommentLikeFn.loading}
-                Icon={likedByMe ? FaHeart : FaRegHeart} 
-                aria-label={likedByMe ? "Unlike" : "Like"}> 
-                    {likeCount}
-                </IconBtn>
-                <IconBtn 
-                onClick={() => setIsReplying(prev => !prev)}
-                isActive={isReplying} 
-                Icon={FaReply} 
-                aria-label={isReplying ? "Cancel Reply" : "Reply"} 
-                />
-                {user.id === currentUser.id && (
-                    <>
-                      <IconBtn
-                        onClick={() => setIsEditing(prev => !prev)}
-                        isActive={isEditing}
-                        Icon={FaEdit}
-                        aria-label={isEditing ? "Cancel Edit" : "Edit"}
-                      />
-                      <IconBtn
-                        disabled={deleteCommentFn.loading}
-                        onClick={onCommentDelete}
-                        Icon={FaTrash}
-                        aria-label="Delete"
-                        color="danger"
-                      />
-                    </>
-                  )}
-            </div>
+ 
              {deleteCommentFn.error && (
           <div className="error-msg mt-1">{deleteCommentFn.error}</div>
         )}

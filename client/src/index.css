@@ -13,6 +13,14 @@ body {
     background: hsl(228, 33%, 97%);
 }
 
+h1 {
+    color: hsl(211, 10%, 45%);
+}
+
+article {
+    color: hsl(211, 10%, 45%);
+}
+
 .container {
     max-width: 1200px;
     width: calc(100vw - 4rem);
@@ -33,10 +41,11 @@ button {
 }
 
 .error-msg {
-    color: hsl(0, 100%, 67%);
+    color: hsl(358, 79%, 66%);
 }
 
 .comments-title {
+    color: hsl(211, 10%, 45%);
     margin-bottom: .5rem;
 }
 
@@ -191,8 +200,17 @@ button {
     font-size: .75em;
 }
 
+.comment .left-header .profile-picture {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
 .comment .header .username {
     font-weight: bold;
+    margin-right: .5rem;
+    margin-left: .5rem;
 }
 
 .comment .header .date {
