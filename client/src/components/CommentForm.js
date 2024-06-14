@@ -18,7 +18,7 @@ function handleSubmit(e) {
             <textarea 
             autoFocus={autoFocus}
             value={message} onChange={e => setMessage(e.target.value)}
-            className="message-input"/>
+            className="message-input" placeholder="   Add a comment..."/> 
             <button className="btn" type="submit" disabled={loading}>
                 { loading ? "loading" : "Send"}
             </button>
