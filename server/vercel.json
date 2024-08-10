@@ -13,7 +13,22 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "DATABASE_URL": "postgresql://postgres.mxkjecdsathwhmzkeqpu:0GClomV9ZIpgFhJw@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+    "CLIENT_URL": "https://interactive-comments-section-client.vercel.app"
+  },
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["prisma/**"]
+      }
+    }
+  ],
+  "hooks": {
+    "build": {
+      "command": "npx prisma generate"
+    }
   }
 }
-
