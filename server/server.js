@@ -6,11 +6,12 @@ import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 dotenv.config()
 
+const app = fastify()
+
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
-const app = fastify()
 app.register(sensible)
 app.register(cookie, { secret: process.env.COOKIE_SECRET})
 app.register(cors, {
