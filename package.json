@@ -5,7 +5,8 @@
   "scripts": {
     "build": "if-env TYPE=server && (cd server && npm install) || (cd client && npm install)",
     "server": "node ./server/server.js",
-    "client": "node cd client && npm start"
+    "client": "node cd client && npm start",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "if-env": "^1.0.4"
