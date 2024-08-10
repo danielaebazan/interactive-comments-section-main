@@ -200,12 +200,4 @@ async function commitToDb(promise) {
   return data;
 }
 
-const PORT = process.env.PORT || 3001;
-
-app.listen({ port: PORT }, (err, address) => {
-  if (err) {
-    app.log.error(err);
-    process.exit(1);
-  }
-  app.log.info(`Server listening on ${address}`);
-});
+app.listen({ port: process.env.PORT });
