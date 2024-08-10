@@ -8,16 +8,13 @@ dotenv.config()
 
 const app = fastify()
 
-app.get("/", (req, res) => {
-  res.send("Server is running");
+app.register(cors, {
+  origin: process.env.CLIENT_URL,
+  credentials: true,
 });
 
 app.register(sensible)
 app.register(cookie, { secret: process.env.COOKIE_SECRET})
-app.register(cors, {
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-})
 
 app.addHook("onRequest", (req, res, done) => {
   if (req.cookies.userId != CURRENT_USER_ID) {
