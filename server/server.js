@@ -33,7 +33,7 @@ let CURRENT_USER_ID;
 async function getCurrentUserId() {
   if (!CURRENT_USER_ID) {
     const { data } = await supabase
-      .from('User')  // Ensure table name matches exactly
+      .from('User')
       .select('id')
       .eq('username', 'juliusomo')
       .single();
@@ -58,142 +58,178 @@ app.get("/", (req, res) => {
 });
 
 app.get("/posts", async (req, res) => {
-  return await queryDb(
-    supabase.from('Post').select('id, title')  // Ensure table name and column names match exactly
-  );
+  try {
+    return await queryDb(
+      supabase.from('Post').select('id, title')
+    );
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    return res.status(500).send({ error: 'Failed to fetch posts', details: error.message });
+  }
 });
 
 app.get("/posts/:id", async (req, res) => {
-  const post = await queryDb(
-    supabase
-      .from('Post')  // Ensure table name matches exactly
-      .select(`
-        id, 
-        body, 
-        title, 
-        comments:Comment (  // Ensure table name matches exactly
+  try {
+    const post = await queryDb(
+      supabase
+        .from('Post')
+        .select(`
           id, 
-          message, 
-          parentId, 
-          createdAt,
-          user:User (id, username),  // Ensure table name matches exactly
-          likes:Like (id, userId)  // Ensure table name matches exactly
-        )
-      `)
-      .eq('id', req.params.id)
-      .single()
-  );
+          body, 
+          title, 
+          comments:Comment (
+            id, 
+            message, 
+            parentId, 
+            createdAt,
+            user:User (
+              id, 
+              username
+            ),
+            likes:Like (
+              id, 
+              userId
+            )
+          )
+        `)
+        .eq('id', req.params.id)
+        .single()
+    );
 
-  const userId = req.cookies.userId;
+    const userId = req.cookies.userId;
 
-  return {
-    ...post,
-    comments: post.comments.map(comment => ({
-      ...comment,
-      likedByMe: comment.likes.some(like => like.userId === userId),
-      likeCount: comment.likes.length,
-    }))
-  };
+    return {
+      ...post,
+      comments: post.comments.map(comment => ({
+        ...comment,
+        likedByMe: comment.likes.some(like => like.userId === userId),
+        likeCount: comment.likes.length,
+      }))
+    };
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    return res.status(500).send({ error: 'Failed to fetch post', details: error.message });
+  }
 });
 
 app.post("/posts/:id/comments", async (req, res) => {
-  if (req.body.message === "" || req.body.message == null) {
-    return res.send(app.httpErrors.badRequest("Message is required"));
+  try {
+    if (!req.body.message || req.body.message.trim() === "") {
+      return res.send(app.httpErrors.badRequest("Message is required"));
+    }
+
+    const comment = await queryDb(
+      supabase
+        .from('Comment')
+        .insert({
+          message: req.body.message,
+          userId: req.cookies.userId,
+          parentId: req.body.parentId,
+          postId: req.params.id,
+        })
+        .select('id, message, parentId, createdAt, user:User(id, username)')
+        .single()
+    );
+
+    return { 
+      ...comment,
+      likeCount: 0,
+      likedByMe: false,
+    };
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    return res.status(500).send({ error: 'Failed to add comment', details: error.message });
   }
-
-  const comment = await queryDb(
-    supabase
-      .from('Comment')  // Ensure table name matches exactly
-      .insert({
-        message: req.body.message,
-        userId: req.cookies.userId,
-        parentId: req.body.parentId,
-        postId: req.params.id,
-      })
-      .select('id, message, parentId, createdAt, user:User(id, username)')  // Ensure table name matches exactly
-      .single()
-  );
-
-  return { 
-    ...comment,
-    likeCount: 0,
-    likedByMe: false,
-  };
 });
 
 app.put("/posts/:postId/comments/:commentId", async (req, res) => {
-  if (req.body.message === "" || req.body.message == null) {
-    return res.send(app.httpErrors.badRequest("Message is required"));
-  }
+  try {
+    if (!req.body.message || req.body.message.trim() === "") {
+      return res.send(app.httpErrors.badRequest("Message is required"));
+    }
 
-  const { data: comment } = await supabase
-    .from('Comment')  // Ensure table name matches exactly
-    .select('userId')
-    .eq('id', req.params.commentId)
-    .single();
-
-  if (comment.userId !== req.cookies.userId) {
-    return res.send(
-      app.httpErrors.unauthorized("You do not have permission to edit this message")
-    );
-  }
-
-  return await queryDb(
-    supabase
-      .from('Comment')  // Ensure table name matches exactly
-      .update({ message: req.body.message })
+    const { data: comment } = await supabase
+      .from('Comment')
+      .select('userId')
       .eq('id', req.params.commentId)
-      .select('message')
-      .single()
-  );
+      .single();
+
+    if (comment.userId !== req.cookies.userId) {
+      return res.send(
+        app.httpErrors.unauthorized("You do not have permission to edit this message")
+      );
+    }
+
+    return await queryDb(
+      supabase
+        .from('Comment')
+        .update({ message: req.body.message })
+        .eq('id', req.params.commentId)
+        .select('message')
+        .single()
+    );
+  } catch (error) {
+    console.error('Error updating comment:', error);
+    return res.status(500).send({ error: 'Failed to update comment', details: error.message });
+  }
 });
 
 app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
-  const { data: comment } = await supabase
-    .from('Comment')  // Ensure table name matches exactly
-    .select('userId')
-    .eq('id', req.params.commentId)
-    .single();
-
-  if (comment.userId !== req.cookies.userId) {
-    return res.send(
-      app.httpErrors.unauthorized("You do not have permission to delete this message")
-    );
-  }
-
-  return await queryDb(
-    supabase
-      .from('Comment')  // Ensure table name matches exactly
-      .delete()
+  try {
+    const { data: comment } = await supabase
+      .from('Comment')
+      .select('userId')
       .eq('id', req.params.commentId)
-      .select('id')
-      .single()
-  );
+      .single();
+
+    if (comment.userId !== req.cookies.userId) {
+      return res.send(
+        app.httpErrors.unauthorized("You do not have permission to delete this message")
+      );
+    }
+
+    return await queryDb(
+      supabase
+        .from('Comment')
+        .delete()
+        .eq('id', req.params.commentId)
+        .select('id')
+        .single()
+    );
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return res.status(500).send({ error: 'Failed to delete comment', details: error.message });
+  }
 });
 
 app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
-  const data = {
-    commentId: req.params.commentId,
-    userId: req.cookies.userId,
-  };
+  try {
+    const data = {
+      commentId: req.params.commentId,
+      userId: req.cookies.userId,
+    };
 
-  const { data: like } = await supabase
-    .from('Like')  // Ensure table name matches exactly
-    .select()
-    .match(data)
-    .single();
+    const { data: like } = await supabase
+      .from('Like')
+      .select()
+      .match(data)
+      .single();
 
-  if (!like) {
-    await queryDb(supabase.from('Like').insert(data));  // Ensure table name matches exactly
-    return { addLike: true };
-  } else {
-    await queryDb(
-      supabase
-        .from('Like')  // Ensure table name matches exactly
-        .delete()
-        .match(data)
-    );
-    return { addLike: false };
+    if (!like) {
+      await queryDb(supabase.from('Like').insert(data));
+      return { addLike: true };
+    } else {
+      await queryDb(
+        supabase
+          .from('Like')
+          .delete()
+          .match(data)
+      );
+      return { addLike: false };
+    }
+  } catch (error) {
+    console.error('Error toggling like:', error);
+    return res.status(500).send({ error: 'Failed to toggle like', details: error.message });
   }
 });
 
@@ -207,4 +243,4 @@ app.setErrorHandler(function (error, request, reply) {
 export default async (req, res) => {
   await app.ready();
   app.server.emit('request', req, res);
-}; 
+};
