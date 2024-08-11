@@ -59,9 +59,10 @@ app.get("/", (req, res) => {
 
 app.get("/posts", async (req, res) => {
   try {
-    return await queryDb(
+    const posts = await queryDb(
       supabase.from('Post').select('id, title')
     );
+    return posts;
   } catch (error) {
     console.error('Error fetching posts:', error);
     return res.status(500).send({ error: 'Failed to fetch posts', details: error.message });
@@ -70,41 +71,46 @@ app.get("/posts", async (req, res) => {
 
 app.get("/posts/:id", async (req, res) => {
   try {
-    const post = await queryDb(
-      supabase
-        .from('Post')
-        .select(`
-          id, 
-          body, 
-          title, 
-          comments:Comment (
-            id, 
-            message, 
-            parentId, 
-            createdAt,
-            user:User (
-              id, 
-              username
-            ),
-            likes:Like (
-              id, 
-              userId
-            )
-          )
-        `)
-        .eq('id', req.params.id)
-        .single()
-    );
+    // Fetch post data
+    const { data: post, error: postError } = await supabase
+      .from('Post')
+      .select('id, title, body')
+      .eq('id', req.params.id)
+      .single();
+    
+    if (postError) throw postError;
 
+    // Fetch comments data
+    const { data: comments, error: commentsError } = await supabase
+      .from('Comment')
+      .select(`
+        id, 
+        message, 
+        createdAt, 
+        user:User (
+          id, 
+          username
+        ),
+        likes:Like (
+          id, 
+          userId
+        )
+      `)
+      .eq('postId', req.params.id);
+
+    if (commentsError) throw commentsError;
+
+    // Enhance comments with like information
     const userId = req.cookies.userId;
+    const enhancedComments = comments.map(comment => ({
+      ...comment,
+      likedByMe: comment.likes.some(like => like.userId === userId),
+      likeCount: comment.likes.length,
+    }));
 
     return {
       ...post,
-      comments: post.comments.map(comment => ({
-        ...comment,
-        likedByMe: comment.likes.some(like => like.userId === userId),
-        likeCount: comment.likes.length,
-      }))
+      comments: enhancedComments,
     };
   } catch (error) {
     console.error('Error fetching post:', error);
@@ -209,11 +215,13 @@ app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
       userId: req.cookies.userId,
     };
 
-    const { data: like } = await supabase
+    const { data: like, error: likeError } = await supabase
       .from('Like')
       .select()
       .match(data)
       .single();
+
+    if (likeError) throw likeError;
 
     if (!like) {
       await queryDb(supabase.from('Like').insert(data));
