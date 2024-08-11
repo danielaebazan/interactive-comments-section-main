@@ -33,7 +33,7 @@ let CURRENT_USER_ID;
 async function getCurrentUserId() {
   if (!CURRENT_USER_ID) {
     const { data } = await supabase
-      .from('User')  // Updated table name
+      .from('User')  // Ensure table name matches exactly
       .select('id')
       .eq('username', 'juliusomo')
       .single();
@@ -59,25 +59,25 @@ app.get("/", (req, res) => {
 
 app.get("/posts", async (req, res) => {
   return await queryDb(
-    supabase.from('Post').select('id, title')  // Updated table name
+    supabase.from('Post').select('id, title')  // Ensure table name and column names match exactly
   );
 });
 
 app.get("/posts/:id", async (req, res) => {
   const post = await queryDb(
     supabase
-      .from('Post')  // Updated table name
+      .from('Post')  // Ensure table name matches exactly
       .select(`
         id, 
         body, 
         title, 
-        comments:Comment (  // Updated table name
+        comments:Comment (  // Ensure table name matches exactly
           id, 
           message, 
           parentId, 
           createdAt,
-          user:User (id, username),  // Updated table name
-          likes:Like (id, userId)  // Updated table name
+          user:User (id, username),  // Ensure table name matches exactly
+          likes:Like (id, userId)  // Ensure table name matches exactly
         )
       `)
       .eq('id', req.params.id)
@@ -85,7 +85,7 @@ app.get("/posts/:id", async (req, res) => {
   );
 
   const userId = req.cookies.userId;
-  
+
   return {
     ...post,
     comments: post.comments.map(comment => ({
@@ -103,14 +103,14 @@ app.post("/posts/:id/comments", async (req, res) => {
 
   const comment = await queryDb(
     supabase
-      .from('Comment')  // Updated table name
+      .from('Comment')  // Ensure table name matches exactly
       .insert({
         message: req.body.message,
         userId: req.cookies.userId,
         parentId: req.body.parentId,
         postId: req.params.id,
       })
-      .select('id, message, parentId, createdAt, user:User(id, username)')  // Updated table name
+      .select('id, message, parentId, createdAt, user:User(id, username)')  // Ensure table name matches exactly
       .single()
   );
 
@@ -127,7 +127,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
   }
 
   const { data: comment } = await supabase
-    .from('Comment')  // Updated table name
+    .from('Comment')  // Ensure table name matches exactly
     .select('userId')
     .eq('id', req.params.commentId)
     .single();
@@ -140,7 +140,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
 
   return await queryDb(
     supabase
-      .from('Comment')  // Updated table name
+      .from('Comment')  // Ensure table name matches exactly
       .update({ message: req.body.message })
       .eq('id', req.params.commentId)
       .select('message')
@@ -150,7 +150,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
 
 app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
   const { data: comment } = await supabase
-    .from('Comment')  // Updated table name
+    .from('Comment')  // Ensure table name matches exactly
     .select('userId')
     .eq('id', req.params.commentId)
     .single();
@@ -163,7 +163,7 @@ app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
 
   return await queryDb(
     supabase
-      .from('Comment')  // Updated table name
+      .from('Comment')  // Ensure table name matches exactly
       .delete()
       .eq('id', req.params.commentId)
       .select('id')
@@ -178,18 +178,18 @@ app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
   };
 
   const { data: like } = await supabase
-    .from('Like')  // Updated table name
+    .from('Like')  // Ensure table name matches exactly
     .select()
     .match(data)
     .single();
 
   if (!like) {
-    await queryDb(supabase.from('Like').insert(data));  // Updated table name
+    await queryDb(supabase.from('Like').insert(data));  // Ensure table name matches exactly
     return { addLike: true };
   } else {
     await queryDb(
       supabase
-        .from('Like')  // Updated table name
+        .from('Like')  // Ensure table name matches exactly
         .delete()
         .match(data)
     );
@@ -207,4 +207,4 @@ app.setErrorHandler(function (error, request, reply) {
 export default async (req, res) => {
   await app.ready();
   app.server.emit('request', req, res);
-};
+}; 
