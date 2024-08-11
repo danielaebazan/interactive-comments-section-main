@@ -33,7 +33,7 @@ let CURRENT_USER_ID;
 async function getCurrentUserId() {
   if (!CURRENT_USER_ID) {
     const { data } = await supabase
-      .from('users')
+      .from('User')  // Updated table name
       .select('id')
       .eq('username', 'juliusomo')
       .single();
@@ -59,25 +59,25 @@ app.get("/", (req, res) => {
 
 app.get("/posts", async (req, res) => {
   return await queryDb(
-    supabase.from('posts').select('id, title')
+    supabase.from('Post').select('id, title')  // Updated table name
   );
 });
 
 app.get("/posts/:id", async (req, res) => {
   const post = await queryDb(
     supabase
-      .from('posts')
+      .from('Post')  // Updated table name
       .select(`
         id, 
         body, 
         title, 
-        comments (
+        comments:Comment (  // Updated table name
           id, 
           message, 
           parentId, 
           createdAt,
-          user:users (id, username),
-          likes (id, userId)
+          user:User (id, username),  // Updated table name
+          likes:Like (id, userId)  // Updated table name
         )
       `)
       .eq('id', req.params.id)
@@ -103,14 +103,14 @@ app.post("/posts/:id/comments", async (req, res) => {
 
   const comment = await queryDb(
     supabase
-      .from('comments')
+      .from('Comment')  // Updated table name
       .insert({
         message: req.body.message,
         userId: req.cookies.userId,
         parentId: req.body.parentId,
         postId: req.params.id,
       })
-      .select('id, message, parentId, createdAt, user:users(id, username)')
+      .select('id, message, parentId, createdAt, user:User(id, username)')  // Updated table name
       .single()
   );
 
@@ -127,7 +127,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
   }
 
   const { data: comment } = await supabase
-    .from('comments')
+    .from('Comment')  // Updated table name
     .select('userId')
     .eq('id', req.params.commentId)
     .single();
@@ -140,7 +140,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
 
   return await queryDb(
     supabase
-      .from('comments')
+      .from('Comment')  // Updated table name
       .update({ message: req.body.message })
       .eq('id', req.params.commentId)
       .select('message')
@@ -150,7 +150,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
 
 app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
   const { data: comment } = await supabase
-    .from('comments')
+    .from('Comment')  // Updated table name
     .select('userId')
     .eq('id', req.params.commentId)
     .single();
@@ -163,7 +163,7 @@ app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
 
   return await queryDb(
     supabase
-      .from('comments')
+      .from('Comment')  // Updated table name
       .delete()
       .eq('id', req.params.commentId)
       .select('id')
@@ -178,18 +178,18 @@ app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
   };
 
   const { data: like } = await supabase
-    .from('likes')
+    .from('Like')  // Updated table name
     .select()
     .match(data)
     .single();
 
   if (!like) {
-    await queryDb(supabase.from('likes').insert(data));
+    await queryDb(supabase.from('Like').insert(data));  // Updated table name
     return { addLike: true };
   } else {
     await queryDb(
       supabase
-        .from('likes')
+        .from('Like')  // Updated table name
         .delete()
         .match(data)
     );
