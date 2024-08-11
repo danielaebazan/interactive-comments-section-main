@@ -3,7 +3,7 @@ import sensible from "@fastify/sensible";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import dotenv from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -18,42 +18,38 @@ app.register(cors, {
 app.register(sensible);
 app.register(cookie, { secret: process.env.COOKIE_SECRET });
 
-// Prisma client initialization
-let prisma;
-if (process.env.NODE_ENV === "production") {
-  prisma = new PrismaClient();
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-  prisma = global.prisma;
+// Initialize Supabase client
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+
+// Helper function to handle Supabase queries
+async function queryDb(promise) {
+  const { data, error } = await promise;
+  if (error) throw error;
+  return data;
 }
 
-const CURRENT_USER_ID = (
-  await prisma.user.findFirst({ where: { username: "juliusomo" } })
-).id;
-
-const COMMENT_SELECT_FIELDS = {
-  id: true,
-  message: true,
-  parentId: true,
-  createdAt: true,
-  user: {
-    select: {
-      id: true,
-      username: true,
-    },
-  },
-};
+// Get current user ID
+let CURRENT_USER_ID;
+async function getCurrentUserId() {
+  if (!CURRENT_USER_ID) {
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', 'juliusomo')
+      .single();
+    CURRENT_USER_ID = data.id;
+  }
+  return CURRENT_USER_ID;
+}
 
 // Middleware to handle cookies
-app.addHook("onRequest", (req, res, done) => {
-  if (req.cookies.userId != CURRENT_USER_ID) {
-    req.cookies.userId = CURRENT_USER_ID;
+app.addHook("onRequest", async (req, res) => {
+  const currentUserId = await getCurrentUserId();
+  if (req.cookies.userId != currentUserId) {
+    req.cookies.userId = currentUserId;
     res.clearCookie("userId");
-    res.setCookie("userId", CURRENT_USER_ID);
+    res.setCookie("userId", currentUserId);
   }
-  done();
 });
 
 // Define routes
@@ -62,55 +58,42 @@ app.get("/", (req, res) => {
 });
 
 app.get("/posts", async (req, res) => {
-  return await commitToDb(
-    prisma.post.findMany({
-      select: {
-        id: true,
-        title: true,
-      },
-    })
+  return await queryDb(
+    supabase.from('posts').select('id, title')
   );
 });
 
 app.get("/posts/:id", async (req, res) => {
-  return await commitToDb(
-    prisma.post.findUnique({
-      where: { id: req.params.id },
-      select: {
-        body: true,
-        title: true,
-        comments: {
-          orderBy: {
-            createdAt: "desc",
-          },
-          select: {
-            ...COMMENT_SELECT_FIELDS,
-            _count: { select: { likes: true } },
-          },
-        },
-      },
-    })
-    .then(async post => {
-      const likes = await prisma.like.findMany({
-        where: {
-          userId: req.cookies.userId,
-          commentId: { in: post.comments.map(comment => comment.id) },
-        },
-      });
-
-      return {
-        ...post,
-        comments: post.comments.map(comment => {
-          const { _count, ...commentFields } = comment;
-          return {
-            ...commentFields,
-            likedByMe: likes.find(like => like.commentId === comment.id),
-            likeCount: _count.likes,
-          };
-        }),
-      };
-    })
+  const post = await queryDb(
+    supabase
+      .from('posts')
+      .select(`
+        id, 
+        body, 
+        title, 
+        comments (
+          id, 
+          message, 
+          parentId, 
+          createdAt,
+          user:users (id, username),
+          likes (id, userId)
+        )
+      `)
+      .eq('id', req.params.id)
+      .single()
   );
+
+  const userId = req.cookies.userId;
+  
+  return {
+    ...post,
+    comments: post.comments.map(comment => ({
+      ...comment,
+      likedByMe: comment.likes.some(like => like.userId === userId),
+      likeCount: comment.likes.length,
+    }))
+  };
 });
 
 app.post("/posts/:id/comments", async (req, res) => {
@@ -118,23 +101,24 @@ app.post("/posts/:id/comments", async (req, res) => {
     return res.send(app.httpErrors.badRequest("Message is required"));
   }
 
-  return await commitToDb(
-    prisma.comment.create({
-      data: {
+  const comment = await queryDb(
+    supabase
+      .from('comments')
+      .insert({
         message: req.body.message,
         userId: req.cookies.userId,
         parentId: req.body.parentId,
         postId: req.params.id,
-      },
-      select: COMMENT_SELECT_FIELDS,
-    }).then(comment => {
-      return { 
-        ...comment,
-        likeCount: 0,
-        likedByMe: false,
-      };
-    })
+      })
+      .select('id, message, parentId, createdAt, user:users(id, username)')
+      .single()
   );
+
+  return { 
+    ...comment,
+    likeCount: 0,
+    likedByMe: false,
+  };
 });
 
 app.put("/posts/:postId/comments/:commentId", async (req, res) => {
@@ -142,41 +126,48 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
     return res.send(app.httpErrors.badRequest("Message is required"));
   }
 
-  const { userId } = await prisma.comment.findUnique({
-    where: { id: req.params.commentId },
-    select: { userId: true },
-  });
-  if (userId !== req.cookies.userId) {
+  const { data: comment } = await supabase
+    .from('comments')
+    .select('userId')
+    .eq('id', req.params.commentId)
+    .single();
+
+  if (comment.userId !== req.cookies.userId) {
     return res.send(
       app.httpErrors.unauthorized("You do not have permission to edit this message")
     );
   }
 
-  return await commitToDb(
-    prisma.comment.update({
-      where: { id: req.params.commentId },
-      data: { message: req.body.message },
-      select: { message: true },
-    })
+  return await queryDb(
+    supabase
+      .from('comments')
+      .update({ message: req.body.message })
+      .eq('id', req.params.commentId)
+      .select('message')
+      .single()
   );
 });
 
 app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
-  const { userId } = await prisma.comment.findUnique({
-    where: { id: req.params.commentId },
-    select: { userId: true },
-  });
-  if (userId !== req.cookies.userId) {
+  const { data: comment } = await supabase
+    .from('comments')
+    .select('userId')
+    .eq('id', req.params.commentId)
+    .single();
+
+  if (comment.userId !== req.cookies.userId) {
     return res.send(
       app.httpErrors.unauthorized("You do not have permission to delete this message")
     );
   }
 
-  return await commitToDb(
-    prisma.comment.delete({
-      where: { id: req.params.commentId },
-      select: { id: true },
-    })
+  return await queryDb(
+    supabase
+      .from('comments')
+      .delete()
+      .eq('id', req.params.commentId)
+      .select('id')
+      .single()
   );
 });
 
@@ -186,33 +177,30 @@ app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
     userId: req.cookies.userId,
   };
 
-  const like = await prisma.like.findUnique({
-    where: { userId_commentId: data },
-  });
+  const { data: like } = await supabase
+    .from('likes')
+    .select()
+    .match(data)
+    .single();
 
-  if (like == null) {
-    return await commitToDb(prisma.like.create({ data })).then(() => {
-      return { addLike: true };
-    });
+  if (!like) {
+    await queryDb(supabase.from('likes').insert(data));
+    return { addLike: true };
   } else {
-    return await commitToDb(
-      prisma.like.delete({ where: { userId_commentId: data } })
-    ).then(() => {
-      return { addLike: false };
-    });
+    await queryDb(
+      supabase
+        .from('likes')
+        .delete()
+        .match(data)
+    );
+    return { addLike: false };
   }
 });
-
-async function commitToDb(promise) {
-  const [error, data] = await app.to(promise);
-  if (error) return app.httpErrors.internalServerError(error.message);
-  return data;
-}
 
 // Error handling
 app.setErrorHandler(function (error, request, reply) {
   console.error(error);
-  reply.status(500).send({ error: 'Something went wrong' });
+  reply.status(500).send({ error: 'Something went wrong', details: error.message });
 });
 
 // Export for Vercel
