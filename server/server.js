@@ -18,7 +18,16 @@ app.register(cors, {
 app.register(sensible);
 app.register(cookie, { secret: process.env.COOKIE_SECRET });
 
-const prisma = new PrismaClient();
+// Prisma client initialization
+let prisma;
+if (process.env.NODE_ENV === "production") {
+  prisma = new PrismaClient();
+} else {
+  if (!global.prisma) {
+    global.prisma = new PrismaClient();
+  }
+  prisma = global.prisma;
+}
 
 const CURRENT_USER_ID = (
   await prisma.user.findFirst({ where: { username: "juliusomo" } })
@@ -200,4 +209,14 @@ async function commitToDb(promise) {
   return data;
 }
 
-app.listen({ port: process.env.PORT });
+// Error handling
+app.setErrorHandler(function (error, request, reply) {
+  console.error(error);
+  reply.status(500).send({ error: 'Something went wrong' });
+});
+
+// Export for Vercel
+export default async (req, res) => {
+  await app.ready();
+  app.server.emit('request', req, res);
+};
