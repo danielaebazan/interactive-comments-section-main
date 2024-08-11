@@ -59,9 +59,7 @@ app.get("/", (req, res) => {
 
 app.get("/posts", async (req, res) => {
   try {
-    const posts = await queryDb(
-      supabase.from('Post').select('id, title')
-    );
+    const posts = await queryDb(supabase.from('Post').select('id, title'));
     return posts;
   } catch (error) {
     console.error('Error fetching posts:', error);
@@ -71,24 +69,22 @@ app.get("/posts", async (req, res) => {
 
 app.get("/posts/:id", async (req, res) => {
   try {
-    // Fetch post data
+    const { id } = req.params;
     const { data: post, error: postError } = await supabase
       .from('Post')
       .select('id, title, body')
-      .eq('id', req.params.id)
+      .eq('id', id)
       .single();
-    
+
     if (postError) throw postError;
 
-    // Fetch comments data
     const { data: comments, error: commentsError } = await supabase
       .from('Comment')
-      .select('id, message, createdAt, userId, postId')
-      .eq('postId', req.params.id);
+      .select('id, message, createdAt, userId')
+      .eq('postId', id);
 
     if (commentsError) throw commentsError;
 
-    // Fetch users
     const userIds = [...new Set(comments.map(comment => comment.userId))];
     const { data: users, error: usersError } = await supabase
       .from('User')
@@ -97,19 +93,16 @@ app.get("/posts/:id", async (req, res) => {
 
     if (usersError) throw usersError;
 
-    // Create a map of users for quick lookup
     const userMap = users.reduce((acc, user) => {
       acc[user.id] = user;
       return acc;
     }, {});
 
-    // Attach user data to comments
     const enhancedComments = comments.map(comment => ({
       ...comment,
       user: userMap[comment.userId]
     }));
 
-    // Attach likes count and user-like status
     const userId = req.cookies.userId;
     const commentIds = comments.map(comment => comment.id);
     const { data: likes, error: likesError } = await supabase
@@ -144,24 +137,27 @@ app.get("/posts/:id", async (req, res) => {
 app.post("/posts/:id/comments", async (req, res) => {
   try {
     if (!req.body.message || req.body.message.trim() === "") {
-      return res.send(app.httpErrors.badRequest("Message is required"));
+      return res.status(400).send({ error: 'Message is required' });
     }
 
-    const comment = await queryDb(
-      supabase
-        .from('Comment')
-        .insert({
-          message: req.body.message,
-          userId: req.cookies.userId,
-          parentId: req.body.parentId,
-          postId: req.params.id,
-        })
-        .select('id, message, parentId, createdAt, userId')
-        .single()
-    );
+    const { id } = req.params;
+    const userId = req.cookies.userId;
+
+    const { data: newComment, error: insertError } = await supabase
+      .from('Comment')
+      .insert({
+        message: req.body.message,
+        userId: userId,
+        parentId: req.body.parentId || null,
+        postId: id,
+      })
+      .select('id, message, parentId, createdAt, userId')
+      .single();
+
+    if (insertError) throw insertError;
 
     return { 
-      ...comment,
+      ...newComment,
       likeCount: 0,
       likedByMe: false,
     };
@@ -174,29 +170,32 @@ app.post("/posts/:id/comments", async (req, res) => {
 app.put("/posts/:postId/comments/:commentId", async (req, res) => {
   try {
     if (!req.body.message || req.body.message.trim() === "") {
-      return res.send(app.httpErrors.badRequest("Message is required"));
+      return res.status(400).send({ error: 'Message is required' });
     }
 
-    const { data: comment } = await supabase
+    const { postId, commentId } = req.params;
+    const userId = req.cookies.userId;
+
+    const { data: comment, error: commentError } = await supabase
       .from('Comment')
       .select('userId')
-      .eq('id', req.params.commentId)
+      .eq('id', commentId)
       .single();
 
-    if (comment.userId !== req.cookies.userId) {
-      return res.send(
-        app.httpErrors.unauthorized("You do not have permission to edit this message")
-      );
+    if (commentError) throw commentError;
+
+    if (comment.userId !== userId) {
+      return res.status(403).send({ error: 'Unauthorized to edit this comment' });
     }
 
-    const updatedComment = await queryDb(
-      supabase
-        .from('Comment')
-        .update({ message: req.body.message })
-        .eq('id', req.params.commentId)
-        .select('message')
-        .single()
-    );
+    const { data: updatedComment, error: updateError } = await supabase
+      .from('Comment')
+      .update({ message: req.body.message })
+      .eq('id', commentId)
+      .select('message')
+      .single();
+
+    if (updateError) throw updateError;
 
     return updatedComment;
   } catch (error) {
@@ -207,26 +206,29 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
 
 app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
   try {
-    const { data: comment } = await supabase
+    const { postId, commentId } = req.params;
+    const userId = req.cookies.userId;
+
+    const { data: comment, error: commentError } = await supabase
       .from('Comment')
       .select('userId')
-      .eq('id', req.params.commentId)
+      .eq('id', commentId)
       .single();
 
-    if (comment.userId !== req.cookies.userId) {
-      return res.send(
-        app.httpErrors.unauthorized("You do not have permission to delete this message")
-      );
+    if (commentError) throw commentError;
+
+    if (comment.userId !== userId) {
+      return res.status(403).send({ error: 'Unauthorized to delete this comment' });
     }
 
-    const deletedComment = await queryDb(
-      supabase
-        .from('Comment')
-        .delete()
-        .eq('id', req.params.commentId)
-        .select('id')
-        .single()
-    );
+    const { data: deletedComment, error: deleteError } = await supabase
+      .from('Comment')
+      .delete()
+      .eq('id', commentId)
+      .select('id')
+      .single();
+
+    if (deleteError) throw deleteError;
 
     return deletedComment;
   } catch (error) {
@@ -237,29 +239,22 @@ app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
 
 app.post("/posts/:postId/comments/:commentId/toggleLike", async (req, res) => {
   try {
-    const data = {
-      commentId: req.params.commentId,
-      userId: req.cookies.userId,
-    };
+    const { postId, commentId } = req.params;
+    const userId = req.cookies.userId;
 
     const { data: like, error: likeError } = await supabase
       .from('Like')
       .select()
-      .match(data)
+      .match({ commentId, userId })
       .single();
 
     if (likeError) throw likeError;
 
     if (!like) {
-      await queryDb(supabase.from('Like').insert(data));
+      await supabase.from('Like').insert({ commentId, userId });
       return { addLike: true };
     } else {
-      await queryDb(
-        supabase
-          .from('Like')
-          .delete()
-          .match(data)
-      );
+      await supabase.from('Like').delete().match({ commentId, userId });
       return { addLike: false };
     }
   } catch (error) {
