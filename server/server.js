@@ -83,34 +83,57 @@ app.get("/posts/:id", async (req, res) => {
     // Fetch comments data
     const { data: comments, error: commentsError } = await supabase
       .from('Comment')
-      .select(`
-        id, 
-        message, 
-        createdAt, 
-        user:User (
-          id, 
-          username
-        ),
-        likes:Like (
-          id, 
-          userId
-        )
-      `)
+      .select('id, message, createdAt, userId, postId')
       .eq('postId', req.params.id);
 
     if (commentsError) throw commentsError;
 
-    // Enhance comments with like information
-    const userId = req.cookies.userId;
+    // Fetch users
+    const userIds = [...new Set(comments.map(comment => comment.userId))];
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, username')
+      .in('id', userIds);
+
+    if (usersError) throw usersError;
+
+    // Create a map of users for quick lookup
+    const userMap = users.reduce((acc, user) => {
+      acc[user.id] = user;
+      return acc;
+    }, {});
+
+    // Attach user data to comments
     const enhancedComments = comments.map(comment => ({
       ...comment,
-      likedByMe: comment.likes.some(like => like.userId === userId),
-      likeCount: comment.likes.length,
+      user: userMap[comment.userId]
+    }));
+
+    // Attach likes count and user-like status
+    const userId = req.cookies.userId;
+    const commentIds = comments.map(comment => comment.id);
+    const { data: likes, error: likesError } = await supabase
+      .from('Like')
+      .select('commentId, userId')
+      .in('commentId', commentIds);
+
+    if (likesError) throw likesError;
+
+    const likeMap = likes.reduce((acc, like) => {
+      if (!acc[like.commentId]) acc[like.commentId] = [];
+      acc[like.commentId].push(like.userId);
+      return acc;
+    }, {});
+
+    const finalComments = enhancedComments.map(comment => ({
+      ...comment,
+      likedByMe: likeMap[comment.id]?.includes(userId) || false,
+      likeCount: likeMap[comment.id]?.length || 0
     }));
 
     return {
       ...post,
-      comments: enhancedComments,
+      comments: finalComments
     };
   } catch (error) {
     console.error('Error fetching post:', error);
@@ -133,7 +156,7 @@ app.post("/posts/:id/comments", async (req, res) => {
           parentId: req.body.parentId,
           postId: req.params.id,
         })
-        .select('id, message, parentId, createdAt, user:User(id, username)')
+        .select('id, message, parentId, createdAt, userId')
         .single()
     );
 
@@ -166,7 +189,7 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
       );
     }
 
-    return await queryDb(
+    const updatedComment = await queryDb(
       supabase
         .from('Comment')
         .update({ message: req.body.message })
@@ -174,6 +197,8 @@ app.put("/posts/:postId/comments/:commentId", async (req, res) => {
         .select('message')
         .single()
     );
+
+    return updatedComment;
   } catch (error) {
     console.error('Error updating comment:', error);
     return res.status(500).send({ error: 'Failed to update comment', details: error.message });
@@ -194,7 +219,7 @@ app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
       );
     }
 
-    return await queryDb(
+    const deletedComment = await queryDb(
       supabase
         .from('Comment')
         .delete()
@@ -202,6 +227,8 @@ app.delete("/posts/:postId/comments/:commentId", async (req, res) => {
         .select('id')
         .single()
     );
+
+    return deletedComment;
   } catch (error) {
     console.error('Error deleting comment:', error);
     return res.status(500).send({ error: 'Failed to delete comment', details: error.message });
