@@ -13,6 +13,8 @@ const app = fastify();
 app.register(cors, {
   origin: process.env.CLIENT_URL,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 });
 
 app.register(sensible);
@@ -31,7 +33,7 @@ async function queryDb(promise) {
   return data;
 }
 
-// Get current user ID (for testing, you might want to hardcode this)
+// Get current user ID 
 async function getCurrentUserId() {
   const { data } = await supabase
     .from('User')
@@ -92,7 +94,7 @@ app.get('/posts/:id', async (req, res) => {
     const { id } = req.params;
     const post = await queryDb(supabase.from('Post').select('id, title, body').eq('id', id).single());
     
-    const comments = await queryDb(supabase.from('Comment').select('id, message, createdAt, updatedAt, userId, parentId').eq('postId', id));
+    const comments = await queryDb(supabase.from('Comment').select('id, message, createdAt, userId').eq('postId', id));
     const userIds = [...new Set(comments.map(comment => comment.userId))];
     
     const users = await queryDb(supabase.from('User').select('id, username').in('id', userIds));
@@ -138,7 +140,7 @@ app.post('/posts/:id/comments', async (req, res) => {
     const newComment = await queryDb(supabase
       .from('Comment')
       .insert({ message: req.body.message, userId, parentId: req.body.parentId || null, postId: id })
-      .select('id, message, parentId, createdAt, updatedAt, userId')
+      .select('id, message, parentId, createdAt, userId')
       .single());
 
     return { ...newComment, likeCount: 0, likedByMe: false };
@@ -213,10 +215,10 @@ app.post('/posts/:postId/comments/:commentId/toggleLike', async (req, res) => {
     const like = await queryDb(supabase.from('Like').select().match({ commentId, userId }).single());
 
     if (!like) {
-      await queryDb(supabase.from('Like').insert({ commentId, userId }));
+      await supabase.from('Like').insert({ commentId, userId });
       return { addLike: true };
     } else {
-      await queryDb(supabase.from('Like').delete().match({ commentId, userId }));
+      await supabase.from('Like').delete().match({ commentId, userId });
       return { addLike: false };
     }
   } catch (error) {
