@@ -91,13 +91,13 @@ app.get('/posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const post = await queryDb(supabase.from('Post').select('id, title, body').eq('id', id).single());
-
-    const comments = await queryDb(supabase.from('Comment').select('id, message, createdAt, updatedAt, userId, parentId').eq('postId', id));
+    
+    const comments = await queryDb(supabase.from('Comment').select('id, message, createdAt, userId').eq('postId', id));
     const userIds = [...new Set(comments.map(comment => comment.userId))];
-
+    
     const users = await queryDb(supabase.from('User').select('id, username').in('id', userIds));
     const userMap = users.reduce((acc, user) => (acc[user.id] = user, acc), {});
-
+    
     const enhancedComments = comments.map(comment => ({
       ...comment,
       user: userMap[comment.userId],
@@ -126,7 +126,7 @@ app.get('/posts/:id', async (req, res) => {
 });
 
 // Add a new comment
-app.post('/posts/:id', async (req, res) => {
+app.post('/posts/:id/comments', async (req, res) => {
   try {
     if (!req.body.message?.trim()) {
       return res.status(400).send({ error: 'Message is required' });
@@ -138,7 +138,7 @@ app.post('/posts/:id', async (req, res) => {
     const newComment = await queryDb(supabase
       .from('Comment')
       .insert({ message: req.body.message, userId, parentId: req.body.parentId || null, postId: id })
-      .select('id, message, parentId, createdAt, updatedAt, userId')
+      .select('id, message, parentId, createdAt, userId')
       .single());
 
     return { ...newComment, likeCount: 0, likedByMe: false };
@@ -213,10 +213,10 @@ app.post('/posts/:postId/comments/:commentId/toggleLike', async (req, res) => {
     const like = await queryDb(supabase.from('Like').select().match({ commentId, userId }).single());
 
     if (!like) {
-      await queryDb(supabase.from('Like').insert({ commentId, userId }));
+      await supabase.from('Like').insert({ commentId, userId });
       return { addLike: true };
     } else {
-      await queryDb(supabase.from('Like').delete().match({ commentId, userId }));
+      await supabase.from('Like').delete().match({ commentId, userId });
       return { addLike: false };
     }
   } catch (error) {
