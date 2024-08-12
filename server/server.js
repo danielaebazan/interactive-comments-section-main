@@ -58,6 +58,12 @@ app.addHook('onRequest', async (req, res) => {
   }
 });
 
+// List all routes (for debugging)
+app.get('/routes', (req, reply) => {
+  const routes = app.routes.map(route => `${route.method}:${route.url}`);
+  return { routes };
+});
+
 // Test route for database connection
 app.get('/test-db', async (req, res) => {
   try {
