@@ -126,7 +126,7 @@ app.get('/posts/:id', async (req, res) => {
 });
 
 // Add a new comment
-app.post('/posts/:id/comments', async (req, res) => {
+app.post('/posts/:id', async (req, res) => {
   try {
     if (!req.body.message?.trim()) {
       return res.status(400).send({ error: 'Message is required' });
@@ -149,7 +149,7 @@ app.post('/posts/:id/comments', async (req, res) => {
 });
 
 // Update a comment
-app.put('/posts/:postId/comments/:commentId', async (req, res) => {
+app.put('/posts/:id', async (req, res) => {
   try {
     if (!req.body.message?.trim()) {
       return res.status(400).send({ error: 'Message is required' });
@@ -179,7 +179,7 @@ app.put('/posts/:postId/comments/:commentId', async (req, res) => {
 });
 
 // Delete a comment
-app.delete('/posts/:postId/comments/:commentId', async (req, res) => {
+app.delete('/posts/:id', async (req, res) => {
   try {
     const { postId, commentId } = req.params;
     const userId = req.cookies.userId;
@@ -205,7 +205,7 @@ app.delete('/posts/:postId/comments/:commentId', async (req, res) => {
 });
 
 // Toggle like on a comment
-app.post('/posts/:postId/comments/:commentId/toggleLike', async (req, res) => {
+app.post('/posts/:id/toggleLike', async (req, res) => {
   try {
     const { postId, commentId } = req.params;
     const userId = req.cookies.userId;
