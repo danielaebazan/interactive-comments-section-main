@@ -13,6 +13,8 @@ const app = fastify();
 app.register(cors, {
   origin: process.env.CLIENT_URL,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 });
 
 app.register(sensible);
