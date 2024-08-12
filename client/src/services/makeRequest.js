@@ -6,14 +6,18 @@ const api = axios.create({
 })
 
 export function makeRequest(url, options) {
-    console.log(`Requesting URL: ${api.defaults.baseURL}${url}`);
-    return api(url, options)
+  console.log(`Requesting URL: ${api.defaults.baseURL}${url}`, options);
+  return api(url, options)
     .then(res => {
-        console.log(`Response for ${url}:`, res.data);
-        return res.data;
+      console.log(`Response for ${url}:`, res.data);
+      return res.data;
     })
     .catch(error => {
-        console.error(`Error in request to ${url}:`, error);
-        return Promise.reject(error?.response?.data?.message ?? "Error");
-    })
+      console.error(`Error in request to ${url}:`, {
+        message: error?.response?.data?.message,
+        status: error?.response?.status,
+        data: options?.data,
+      });
+      return Promise.reject(error?.response?.data?.message ?? "Error");
+    });
 }
