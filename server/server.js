@@ -25,23 +25,20 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANO
 async function queryDb(promise) {
   const { data, error } = await promise;
   if (error) {
+    console.error('Supabase query error:', error);
     throw new Error(error.message);
   }
   return data;
 }
 
-// Get current user ID
-let CURRENT_USER_ID;
+// Get current user ID (for testing, you might want to hardcode this)
 async function getCurrentUserId() {
-  if (!CURRENT_USER_ID) {
-    const { data } = await supabase
-      .from('User')
-      .select('id')
-      .eq('username', 'juliusomo')
-      .single();
-    CURRENT_USER_ID = data?.id;
-  }
-  return CURRENT_USER_ID;
+  const { data } = await supabase
+    .from('User')
+    .select('id')
+    .eq('username', 'juliusomo')
+    .single();
+  return data?.id;
 }
 
 // Middleware to handle cookies
@@ -50,28 +47,40 @@ app.addHook('onRequest', async (req, res) => {
     const currentUserId = await getCurrentUserId();
     if (req.cookies.userId !== currentUserId) {
       res.clearCookie('userId');
-      res.setCookie('userId', currentUserId);
+      res.setCookie('userId', currentUserId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+      });
     }
   } catch (error) {
-    app.log.error(`Cookie handling error: ${error.message}`);
+    console.error(`Cookie handling error: ${error.message}`);
   }
 });
 
-// Define routes
-app.get('/', async (req, res) => {
-  return 'Server is running';
+// Test route for database connection
+app.get('/test-db', async (req, res) => {
+  try {
+    const data = await queryDb(supabase.from('User').select('id').limit(1));
+    return { success: true, data };
+  } catch (error) {
+    console.error('Database connection error:', error);
+    return res.status(500).send({ error: 'Database connection failed', details: error.message });
+  }
 });
 
+// Get all posts
 app.get('/posts', async (req, res) => {
   try {
     const posts = await queryDb(supabase.from('Post').select('id, title'));
     return posts;
   } catch (error) {
-    app.log.error(`Error fetching posts: ${error.message}`);
+    console.error(`Error fetching posts: ${error.message}`);
     return res.status(500).send({ error: 'Failed to fetch posts', details: error.message });
   }
 });
 
+// Get a single post with comments
 app.get('/posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -105,11 +114,12 @@ app.get('/posts/:id', async (req, res) => {
 
     return { ...post, comments: finalComments };
   } catch (error) {
-    app.log.error(`Error fetching post: ${error.message}`);
+    console.error(`Error fetching post: ${error.message}`);
     return res.status(500).send({ error: 'Failed to fetch post', details: error.message });
   }
 });
 
+// Add a new comment
 app.post('/posts/:id/comments', async (req, res) => {
   try {
     if (!req.body.message?.trim()) {
@@ -127,11 +137,12 @@ app.post('/posts/:id/comments', async (req, res) => {
 
     return { ...newComment, likeCount: 0, likedByMe: false };
   } catch (error) {
-    app.log.error(`Error adding comment: ${error.message}`);
+    console.error(`Error adding comment: ${error.message}`);
     return res.status(500).send({ error: 'Failed to add comment', details: error.message });
   }
 });
 
+// Update a comment
 app.put('/posts/:postId/comments/:commentId', async (req, res) => {
   try {
     if (!req.body.message?.trim()) {
@@ -156,11 +167,12 @@ app.put('/posts/:postId/comments/:commentId', async (req, res) => {
 
     return updatedComment;
   } catch (error) {
-    app.log.error(`Error updating comment: ${error.message}`);
+    console.error(`Error updating comment: ${error.message}`);
     return res.status(500).send({ error: 'Failed to update comment', details: error.message });
   }
 });
 
+// Delete a comment
 app.delete('/posts/:postId/comments/:commentId', async (req, res) => {
   try {
     const { postId, commentId } = req.params;
@@ -181,11 +193,12 @@ app.delete('/posts/:postId/comments/:commentId', async (req, res) => {
 
     return deletedComment;
   } catch (error) {
-    app.log.error(`Error deleting comment: ${error.message}`);
+    console.error(`Error deleting comment: ${error.message}`);
     return res.status(500).send({ error: 'Failed to delete comment', details: error.message });
   }
 });
 
+// Toggle like on a comment
 app.post('/posts/:postId/comments/:commentId/toggleLike', async (req, res) => {
   try {
     const { postId, commentId } = req.params;
@@ -201,16 +214,30 @@ app.post('/posts/:postId/comments/:commentId/toggleLike', async (req, res) => {
       return { addLike: false };
     }
   } catch (error) {
-    app.log.error(`Error toggling like: ${error.message}`);
+    console.error(`Error toggling like: ${error.message}`);
     return res.status(500).send({ error: 'Failed to toggle like', details: error.message });
   }
 });
 
 // Error handling
 app.setErrorHandler((error, request, reply) => {
-  app.log.error(`Unhandled error: ${error.message}`);
+  console.error(`Unhandled error: ${error.message}`);
   reply.status(500).send({ error: 'Something went wrong', details: error.message });
 });
+
+// Start the server if not being run by Vercel
+if (process.env.NODE_ENV !== 'production') {
+  const start = async () => {
+    try {
+      await app.listen({ port: process.env.PORT || 3000 });
+      console.log(`Server listening on ${app.server.address().port}`);
+    } catch (err) {
+      app.log.error(err);
+      process.exit(1);
+    }
+  };
+  start();
+}
 
 // Export for Vercel
 export default async (req, res) => {
